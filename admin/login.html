@@ -29,12 +29,17 @@
             border-radius: 4px;
             cursor: pointer;
         }
+        .error-message {
+            color: red;
+            display: none;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="login-container">
         <h2>관리자 로그인</h2>
-        <form id="loginForm" onsubmit="handleLogin(event)">
+        <form id="loginForm">
             <div class="form-group">
                 <label for="username">아이디</label>
                 <input type="text" id="username" required>
@@ -44,24 +49,42 @@
                 <input type="password" id="password" required>
             </div>
             <button type="submit">로그인</button>
+            <p id="errorMessage" class="error-message"></p>
         </form>
     </div>
 
+    <script src="../js/config.js"></script>
     <script src="../js/auth.js"></script>
     <script>
-        const auth = new Auth();
-
-        async function handleLogin(event) {
-            event.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            if (await auth.login(username, password)) {
-                window.location.href = 'index.html';
-            } else {
-                alert('로그인 실패');
-            }
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded');
+            const loginForm = document.getElementById('loginForm');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            loginForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                console.log('Form submitted');
+                
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                
+                try {
+                    const auth = new Auth();  // Auth 인스턴스 생성
+                    console.log('Attempting login...');
+                    
+                    if (await auth.login(username, password)) {
+                        window.location.href = 'index.html';
+                    } else {
+                        errorMessage.textContent = '아이디 또는 비밀번호가 일치하지 않습니다.';
+                        errorMessage.style.display = 'block';
+                    }
+                } catch (e) {
+                    console.error('Login error:', e);
+                    errorMessage.textContent = '로그인 처리 중 오류가 발생했습니다: ' + e.message;
+                    errorMessage.style.display = 'block';
+                }
+            });
+        });
     </script>
 </body>
 </html>
