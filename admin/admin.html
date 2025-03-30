@@ -119,7 +119,14 @@
         </div>
     </div>
 
+    <script src="../js/auth.js"></script>
+    <script src="../js/config.js"></script>
     <script>
+        const auth = new Auth();
+        if (!auth.checkAuth()) {
+            window.location.href = 'login.html';
+        }
+
         function createCalendar() {
             const today = new Date();
             createMonthCalendar(today, 'currentMonth');
