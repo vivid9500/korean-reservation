@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>한국어 강의 예약</title>
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .timetable {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 5px;
+            margin-bottom: 20px;
+            width: 400px;
+            margin: 0 auto;
+        }
+
+        .time-cell {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+            height: 30px;
+            line-height: 30px;
+        }
+
+        .header-cell {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .time-header {
+            position: sticky;
+            left: 0;
+            background-color: #f0f0f0;
+            z-index: 1;
+        }
+
+        .time-slot {
+            cursor: pointer;
+        }
+
+        .available {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .unavailable {
+            background-color: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 5px;
+            position: relative;
+            z-index: 1001;
+        }
+
+        .close {
+            float: right;
+            cursor: pointer;
+            font-size: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .back-button {
+            background-color: #666;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        .back-button:hover {
+            background-color: #555;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="goBack()" class="back-button">← 달력으로 돌아가기</button>
+    <h1>한국어 강의 예약</h1>
+    <h2 id="selectedDate"></h2>
+    <div id="timetable" class="timetable"></div>
+
+    <!-- 예약 모달 -->
+    <div id="reservationModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>강의 예약</h2>
+            <p id="selectedTime"></p>
+            <form id="reservationForm" onsubmit="submitForm(event)">
+                <div class="form-group">
+                    <label for="name">이름:</label>
+                    <input type="text" id="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">휴대폰 번호:</label>
+                    <input type="tel" id="phone" pattern="[0-9]{3}-[0-9]{4}-[0-9]{4}" 
+                           placeholder="010-1234-5678" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="classType">수업 방식:</label>
+                    <select id="classType" required>
+                        <option value="">선택해주세요</option>
+                        <option value="online">온라인</option>
+                        <option value="offline">오프라인</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="courseType">수업 내용:</label>
+                    <select id="courseType" required>
+                        <option value="">선택해주세요</option>
+                        <option value="jobPostings">Learning Korean Through Job Postings</option>
+                        <option value="partTime">Korean for Part-Time Work</option>
+                        <option value="daily">Everyday Korean for Daily Life</option>
+                        <option value="topikBeginner">TOPIK Preparation (Beginner)</option>
+                        <option value="topikIntermediate">TOPIK Preparation (Intermediate)</option>
+                        <option value="topikAdvanced">TOPIK Preparation (Advanced)</option>
+                    </select>
+                </div>
+
+                <button type="submit">예약하기</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // URL에서 선택된 날짜 가져오기
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedDate = urlParams.get('date');
+
+        function createTimetable() {
+            const timetable = document.getElementById('timetable');
+            timetable.innerHTML = '';
+            const hours = Array.from({length: 15}, (_, i) => i + 10);
+
+            // 저장된 스케줄 데이터와 고정 일정 로드
+            const savedData = JSON.parse(localStorage.getItem('scheduleData') || '{}');
+            const fixedSchedule = JSON.parse(localStorage.getItem('fixedSchedule') || '{}');
+            const dateSchedule = savedData[selectedDate] || {};
+
+            // 시간별 셀 추가
+            hours.forEach(hour => {
+                // 시간 표시 셀
+                const timeCell = document.createElement('div');
+                timeCell.className = 'time-cell header-cell time-header';
+                
+                const currentHour = hour.toString().padStart(2, '0');
+                const nextHour = ((hour + 1) % 24).toString().padStart(2, '0');
+                const timeDisplay = `${currentHour}:00~${nextHour}:00`;
+                
+                timeCell.textContent = timeDisplay;
+                timetable.appendChild(timeCell);
+
+                // 예약 가능 여부 셀
+                const cell = document.createElement('div');
+                cell.className = 'time-cell time-slot';
+                
+                // 고정 일정 체크
+                if (fixedSchedule[timeDisplay]) {
+                    cell.classList.add('unavailable');
+                    cell.style.cursor = 'not-allowed';
+                } else {
+                    // 저장된 데이터가 있으면 그 값을 사용하고, 없으면 기본값을 true로 설정
+                    const isAvailable = dateSchedule[timeDisplay] !== undefined ? dateSchedule[timeDisplay] : true;
+                    cell.classList.add(isAvailable ? 'available' : 'unavailable');
+                    
+                    if (isAvailable) {
+                        cell.onclick = () => openModal(selectedDate, timeDisplay);
+                    }
+                }
+                
+                timetable.appendChild(cell);
+            });
+        }
+
+        function openModal(date, time) {
+            const modal = document.getElementById('reservationModal');
+            const selectedTime = document.getElementById('selectedTime');
+            selectedTime.textContent = `선택한 날짜: ${date} ${time}`;
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('reservationModal');
+            modal.style.display = 'none';
+            document.getElementById('reservationForm').reset();
+        }
+
+        function submitForm(event) {
+            event.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                classType: document.getElementById('classType').value,
+                courseType: document.getElementById('courseType').value,
+                timeSlot: document.getElementById('selectedTime').textContent
+            };
+
+            console.log('예약 정보:', formData);
+            alert('예약이 완료되었습니다.');
+            closeModal();
+        }
+
+        // 날짜가 선택되지 않았다면 달력으로 돌아가기
+        if (!selectedDate) {
+            alert('날짜를 선택해주세요.');
+            window.location.href = 'index.html';
+        } else {
+            // 선택된 날짜 표시
+            const dateObj = new Date(selectedDate);
+            const formattedDate = `${dateObj.getFullYear()}년 ${dateObj.getMonth() + 1}월 ${dateObj.getDate()}일`;
+            document.getElementById('selectedDate').textContent = `선택한 날짜: ${formattedDate}`;
+            
+            // 시간표 생성
+            createTimetable();
+        }
+
+        // 뒤로가기 함수 추가
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
